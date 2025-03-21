@@ -34,19 +34,62 @@ export function AboutPage() {
           <h2 className="text-xl font-semibold mb-3">Key Features</h2>
           <ul className="list-disc ml-6 space-y-1 text-gray-700">
             <li>Live component rendering with state management</li>
-            <li>SVG rendering with sanitization</li>
-            <li>Mermaid diagram visualization</li>
-            <li>Tagging system for organization</li>
-            <li>Folder categorization</li>
-            <li>Advanced filtering and search</li>
+            <li>SVG rendering with sanitization and download options</li>
+            <li>Mermaid diagram visualization with SVG export</li>
+            <li>Hierarchical folder system for better organization</li>
+            <li>Tagging system for flexible categorization</li>
+            <li>Advanced filtering, searching, and sorting</li>
+            <li>Automatic type detection based on content</li>
+            <li>Complete artifact management (create, edit, delete)</li>
             <li>Import/export functionality for sharing</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">How to Use Artifacts Gallery</h2>
+          
+          <h3 className="text-lg font-medium mt-4 mb-2">Navigating the Gallery</h3>
+          <ul className="list-disc ml-6 space-y-1 text-gray-700">
+            <li>Use the folder breadcrumb navigation to move between folders</li>
+            <li>Click on folder cards to navigate into subfolders</li>
+            <li>Use the Home button to return to the root directory</li>
+            <li>Apply filters to narrow down artifacts by type, tag, or folder</li>
+            <li>Use the search bar to find artifacts by title, description, or tags</li>
+          </ul>
+
+          <h3 className="text-lg font-medium mt-4 mb-2">Creating Artifacts</h3>
+          <ul className="list-disc ml-6 space-y-1 text-gray-700">
+            <li>Click "Create New Artifact" in the gallery</li>
+            <li>Fill in title, description, and select a type (or enable auto-detection)</li>
+            <li>Choose an existing folder from the dropdown or create a new one</li>
+            <li>To create a subfolder, check "Create as subfolder" and select a parent folder</li>
+            <li>Add relevant tags for better organization and discoverability</li>
+            <li>Paste your code in the editor (the type will be automatically detected if enabled)</li>
+            <li>Click "Save Artifact" to store your creation</li>
+          </ul>
+
+          <h3 className="text-lg font-medium mt-4 mb-2">Viewing Artifacts</h3>
+          <ul className="list-disc ml-6 space-y-1 text-gray-700">
+            <li>Click "View" on any artifact card to see the rendered content</li>
+            <li>For SVG images, use the "Copy as Image", "Download as PNG", or "Download as SVG" buttons</li>
+            <li>For Mermaid diagrams, use the "Download as SVG" button</li>
+            <li>The code is displayed below the rendered artifact</li>
+            <li>Use "Copy to Clipboard" to copy the code</li>
+            <li>Use "Download as File" to save the code as a file</li>
+          </ul>
+
+          <h3 className="text-lg font-medium mt-4 mb-2">Managing Artifacts</h3>
+          <ul className="list-disc ml-6 space-y-1 text-gray-700">
+            <li>Click "Edit" to modify an artifact's properties or code</li>
+            <li>Click "Delete" to remove an artifact (with confirmation)</li>
+            <li>Use Import/Export in the gallery to share collections</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-xl font-semibold mb-3">How It Works</h2>
           <p className="text-gray-700">
-            ArtifactVault uses browser localStorage to store your artifacts, which means:
+            Artifacts Gallery uses browser localStorage to store your artifacts, which means:
           </p>
           <ul className="list-disc ml-6 mt-2 space-y-1 text-gray-700">
             <li>Your data persists between sessions without needing a server</li>
@@ -65,19 +108,43 @@ export function AboutPage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold mb-3">Smart Features</h2>
+          
+          <h3 className="text-lg font-medium mt-3 mb-1">Automatic Type Detection</h3>
+          <p className="text-gray-700">
+            The application can automatically detect the correct type (React, SVG, or Mermaid) based on your code content.
+            Toggle this feature on/off in the artifact editor. Color indicators show the detected type,
+            and you'll receive clear error messages if the type is mismatched.
+          </p>
+          
+          <h3 className="text-lg font-medium mt-3 mb-1">Hierarchical Folders</h3>
+          <p className="text-gray-700">
+            Create nested folders and subfolders to organize your artifacts. The breadcrumb navigation makes it easy
+            to move between different levels of the folder structure, providing a file-explorer-like experience.
+          </p>
+          
+          <h3 className="text-lg font-medium mt-3 mb-1">SVG Support with HTML Comments</h3>
+          <p className="text-gray-700">
+            SVG content with HTML comments (which often causes issues in other tools) is properly supported and rendered.
+            The application can detect SVG content even with comments and provides helpful error messages.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold mb-3">Origins</h2>
           <p className="text-gray-700">
             Artifacts Gallery was created by Dominik Lukeš (techczech on GitHub and X) using Claude AI. It is based on the original "Claude Artifact Runner" 
             project by Claudio Silva, which provided a foundation for running Claude-generated artifacts.
           </p>
           <p className="mt-2 text-gray-700">
-            The original project was extended with:
+            The original project was substantially extended with:
           </p>
           <ul className="list-disc ml-6 mt-2 space-y-1 text-gray-700">
             <li>Support for multiple artifact types (SVG, Mermaid)</li>
-            <li>Organization features (tags, folders)</li>
+            <li>Organization features (tags, hierarchical folders)</li>
             <li>Advanced filtering and search</li>
-            <li>Improved user interface</li>
+            <li>Automatic type detection</li>
+            <li>Enhanced UI with better navigation and management</li>
           </ul>
         </section>
 
