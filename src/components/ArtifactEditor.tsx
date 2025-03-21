@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useArtifactStore } from '../lib/store';
+import { Folder, FolderPlus, ChevronDown } from 'lucide-react';
 
 export function ArtifactEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getArtifact, saveArtifact, createArtifact } = useArtifactStore();
+  const { getArtifact, saveArtifact, createArtifact, getAllFolders } = useArtifactStore();
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -13,6 +14,11 @@ export function ArtifactEditor() {
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [folder, setFolder] = useState('');
+  const [folderMode, setFolderMode] = useState<'select' | 'create'>('select');
+  const [existingFolders, setExistingFolders] = useState<string[]>([]);
+  const [newFolder, setNewFolder] = useState('');
+  const [isSubfolder, setIsSubfolder] = useState(false);
+  const [parentFolder, setParentFolder] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(id ? true : false);
   const [saving, setSaving] = useState(false);
@@ -20,6 +26,26 @@ export function ArtifactEditor() {
 
   const isEditing = !!id;
 
+  // Load existing folders
+  useEffect(() => {
+    const loadFolders = async () => {
+      const folders = getAllFolders();
+      
+      // Sort folders by path depth, then alphabetically
+      const sortedFolders = [...folders].sort((a, b) => {
+        const depthA = a.split('/').length;
+        const depthB = b.split('/').length;
+        if (depthA !== depthB) return depthA - depthB;
+        return a.localeCompare(b);
+      });
+      
+      setExistingFolders(sortedFolders);
+    };
+    
+    loadFolders();
+  }, [getAllFolders]);
+
+  // Load artifact for editing
   useEffect(() => {
     const loadArtifact = async () => {
       if (id) {
@@ -30,7 +56,21 @@ export function ArtifactEditor() {
             setDescription(artifact.description || '');
             setType(artifact.type);
             setTags(artifact.tags || []);
-            setFolder(artifact.folder || '');
+            
+            // Handle folder
+            if (artifact.folder) {
+              setFolder(artifact.folder);
+              // If it's a subfolder, set the parent
+              if (artifact.folder.includes('/')) {
+                setIsSubfolder(true);
+                const lastSlashIndex = artifact.folder.lastIndexOf('/');
+                setParentFolder(artifact.folder.substring(0, lastSlashIndex));
+                setNewFolder(artifact.folder.substring(lastSlashIndex + 1));
+              } else {
+                setNewFolder(artifact.folder);
+              }
+            }
+            
             setCode(artifact.code || '');
           } else {
             setError('Artifact not found');
@@ -45,6 +85,34 @@ export function ArtifactEditor() {
 
     loadArtifact();
   }, [id, getArtifact]);
+
+  // Handle folder changes
+  const handleFolderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'new') {
+      setFolderMode('create');
+      setFolder('');
+      setNewFolder('');
+      setIsSubfolder(false);
+      setParentFolder('');
+    } else {
+      setFolderMode('select');
+      setFolder(value);
+    }
+  };
+
+  // Update the final folder path when subfolder inputs change
+  useEffect(() => {
+    if (folderMode === 'create') {
+      if (isSubfolder && parentFolder && newFolder) {
+        setFolder(`${parentFolder}/${newFolder}`);
+      } else if (!isSubfolder && newFolder) {
+        setFolder(newFolder);
+      } else {
+        setFolder('');
+      }
+    }
+  }, [folderMode, isSubfolder, parentFolder, newFolder]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -155,13 +223,98 @@ export function ArtifactEditor() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Folder (optional)</label>
-          <input
-            type="text"
-            value={folder}
-            onChange={(e) => setFolder(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="e.g., UIs, Diagrams, Icons"
-          />
+          
+          <div className="space-y-3">
+            {/* Folder Mode Selection */}
+            <div className="flex items-center space-x-3">
+              <div className={`flex items-center flex-grow ${folderMode === 'select' ? 'border-2 border-blue-500' : 'border'} rounded-md overflow-hidden`}>
+                <div className="bg-gray-100 p-2">
+                  <Folder size={20} className="text-gray-600" />
+                </div>
+                <select
+                  value={folderMode === 'select' ? folder : 'new'}
+                  onChange={handleFolderChange}
+                  className="w-full px-3 py-2 border-none focus:ring-0 focus:outline-none"
+                >
+                  <option value="">No Folder</option>
+                  {existingFolders.map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                  <option value="new">+ Create New Folder</option>
+                </select>
+              </div>
+            </div>
+            
+            {/* New Folder Creation UI */}
+            {folderMode === 'create' && (
+              <div className="border border-gray-300 rounded-md p-3 bg-gray-50">
+                <div className="flex items-center mb-2">
+                  <FolderPlus size={18} className="mr-2 text-blue-500" />
+                  <span className="font-medium">Create New Folder</span>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Subfolder Option */}
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="is-subfolder"
+                      checked={isSubfolder}
+                      onChange={(e) => {
+                        setIsSubfolder(e.target.checked);
+                        if (!e.target.checked) {
+                          setParentFolder('');
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <label htmlFor="is-subfolder" className="text-sm">
+                      Create as subfolder
+                    </label>
+                  </div>
+                  
+                  {/* Parent Folder Selection */}
+                  {isSubfolder && (
+                    <div>
+                      <label className="block text-sm mb-1">Parent Folder</label>
+                      <select
+                        value={parentFolder}
+                        onChange={(e) => setParentFolder(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      >
+                        <option value="">Select a parent folder</option>
+                        {existingFolders.map(f => (
+                          <option key={f} value={f}>{f}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  {/* New Folder Name */}
+                  <div>
+                    <label className="block text-sm mb-1">
+                      {isSubfolder ? 'Subfolder Name' : 'Folder Name'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newFolder}
+                      onChange={(e) => setNewFolder(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="e.g., Components, Charts, Icons"
+                    />
+                  </div>
+                  
+                  {/* Preview of full path */}
+                  {newFolder && (
+                    <div className="text-sm text-gray-600 mt-2">
+                      <span className="font-medium">Full path:</span> {folder || "(none)"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
           <p className="mt-1 text-sm text-gray-500">
             Organize artifacts in folders for easier navigation
           </p>
