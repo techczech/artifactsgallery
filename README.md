@@ -2,6 +2,10 @@
 
 A comprehensive gallery and runtime environment for Claude AI-generated artifacts - store, organize, and run various types of artifacts in one place.
 
+## 🚀 [Try Artifacts Gallery Now!](https://techczech.github.io/artifactsgallery/) - No installation required
+
+![ArtifactVault Screenshot](./screenshot.png)
+
 ## Overview
 
 Artifacts Gallery allows you to:
@@ -16,8 +20,6 @@ Artifacts Gallery allows you to:
 5. **Import and export** your artifact collections
 6. **Auto-detect** artifact types based on content
 7. **Manage artifacts** with edit and delete functionality
-
-![ArtifactVault Screenshot](./screenshot.png)
 
 ## Origin
 
