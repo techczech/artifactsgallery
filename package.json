@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://techczech.github.io/artifacts-gallery",
+  "homepage": "https://techczech.github.io/artifactsgallery",
   "repository": {
     "type": "git",
-    "url": "https://github.com/techczech/artifacts-gallery.git"
+    "url": "https://github.com/techczech/artifactsgallery.git"
   },
   "scripts": {
     "dev": "vite",

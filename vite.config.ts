@@ -8,7 +8,7 @@ export default defineConfig(({ command }) => {
   
   return {
     // Use base path only in production (GitHub Pages)
-    base: isProduction ? '/artifacts-gallery/' : '/',
+    base: isProduction ? '/artifactsgallery/' : '/',
     plugins: [
       react(),
     ],
