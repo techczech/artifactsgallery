@@ -78,25 +78,69 @@ export function ArtifactRunner() {
       useCallback: React.useCallback,
       useMemo: React.useMemo,
       useContext: React.useContext,
+      
       // Add LucideIcons components
       ...LucideIcons,
+      
       // Add Recharts components
-      ...Recharts
+      ...Recharts,
+      
+      // Extract potential Lucide icon imports from the code to ensure they're available
+      ...extractLucideIconImports(code)
     };
+    
+    // Helper function to extract Lucide icon imports from code
+    function extractLucideIconImports(sourceCode: string): Record<string, any> {
+      const importedIcons: Record<string, any> = {};
+      
+      // Look for object destructuring imports: import { Icon1, Icon2 } from 'lucide-react'
+      const objectImportRegex = /import\s+{\s*([^}]*)\s*}\s+from\s+['"]lucide-react['"];?/g;
+      let objectMatch;
+      
+      while ((objectMatch = objectImportRegex.exec(sourceCode)) !== null) {
+        const iconList = objectMatch[1];
+        const icons = iconList.split(',').map(s => s.trim());
+        
+        for (const icon of icons) {
+          if (icon && LucideIcons[icon as keyof typeof LucideIcons]) {
+            importedIcons[icon] = LucideIcons[icon as keyof typeof LucideIcons];
+          }
+        }
+      }
+      
+      // Look for named imports: import IconName from 'lucide-react'
+      const namedImportRegex = /import\s+(\w+)\s+from\s+['"]lucide-react['"];?/g;
+      let namedMatch;
+      
+      while ((namedMatch = namedImportRegex.exec(sourceCode)) !== null) {
+        const iconName = namedMatch[1];
+        if (iconName && LucideIcons[iconName as keyof typeof LucideIcons]) {
+          importedIcons[iconName] = LucideIcons[iconName as keyof typeof LucideIcons];
+        }
+      }
+      
+      return importedIcons;
+    }
 
     try {
       // Process the code to handle imports and exports
       let processedCode = code
         // Remove React imports
-        .replace(/import React.+from\s+['"]react['"];?/g, '')
-        .replace(/import {(.+)} from\s+['"]react['"];?/g, '')
-        // Handle lucide-react imports
-        .replace(/import {(.+)} from\s+['"]lucide-react['"];?/g, '')
-        .replace(/import (\w+) from\s+['"]lucide-react['"];?/g, '')
+        .replace(/import\s+React\s*,?\s*{\s*([^}]*)\s*}\s+from\s+['"]react['"];?/g, '')
+        .replace(/import\s+React\s+from\s+['"]react['"];?/g, '')
+        .replace(/import\s+{\s*([^}]*)\s*}\s+from\s+['"]react['"];?/g, '')
+        // Extract and process lucide-react imports
+        .replace(/import\s+{\s*([^}]*)\s*}\s+from\s+['"]lucide-react['"];?/g, (match, iconList) => {
+          // Leave a comment to show what was imported
+          return `/* Imported Lucide icons: ${iconList} */`;
+        })
+        .replace(/import\s+(\w+)\s+from\s+['"]lucide-react['"];?/g, (match, iconName) => {
+          return `/* Imported Lucide icon: ${iconName} */`;
+        })
         // Handle recharts imports
-        .replace(/import {(.+)} from\s+['"]recharts['"];?/g, '')
+        .replace(/import\s+{\s*([^}]*)\s*}\s+from\s+['"]recharts['"];?/g, '')
         // Comment out other imports
-        .replace(/import (.+) from\s+['"](.+)['"];?/g, '/* import $1 from "$2" */');
+        .replace(/import\s+(.+)\s+from\s+['"](.+)['"];?/g, '/* import $1 from "$2" */');
 
       // Replace export statements with variable declarations
       processedCode = processedCode
@@ -152,8 +196,27 @@ export function ArtifactRunner() {
       
       // Return the React element
       return React.createElement(ComponentClass);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Component execution error:', err);
+      
+      // Check if the error might be related to missing Lucide icons
+      if (err.message && (
+          err.message.includes('is not defined') || 
+          err.message.includes('is not a function'))) {
+        
+        // Extract the icon name from the error message
+        const match = err.message.match(/([\w]+) is not defined/);
+        const iconName = match ? match[1] : null;
+        
+        if (iconName && !globals[iconName] && code.includes(`'lucide-react'`)) {
+          throw new Error(
+            `Missing icon: "${iconName}". Make sure it's properly imported from 'lucide-react'. ` +
+            `Available icons: ${Object.keys(LucideIcons).filter(name => 
+              typeof LucideIcons[name as keyof typeof LucideIcons] === 'function').join(', ')}`
+          );
+        }
+      }
+      
       throw err;
     }
   };
@@ -248,6 +311,13 @@ export function ArtifactRunner() {
             <div className="text-red-500 mb-4">Failed to render component</div>
             <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded font-mono text-sm overflow-auto">
               {renderError}
+              
+              {renderError.includes('lucide-react') && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded">
+                  <strong>Tip:</strong> This error appears to be related to Lucide icons. Make sure you're importing icons that are available in the library.
+                  <div className="mt-2">Common icons include: Image, Cpu, Lightbulb, Sparkles, Database, Smartphone, BrainCircuit, LayoutDashboard, Bot, LineChart, DollarSign</div>
+                </div>
+              )}
             </div>
           </div>
         ) : (

@@ -8,11 +8,14 @@ export function ArtifactGallery() {
   const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Filtering state
+  // Filtering and sorting state
   const [filterType, setFilterType] = useState<'react' | 'svg' | 'mermaid' | 'all'>('all');
   const [filterFolder, setFilterFolder] = useState<string | 'all'>('all');
   const [filterTag, setFilterTag] = useState<string | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'updatedAt' | 'createdAt' | 'title'>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   // Get all available tags and folders for filter dropdowns
   const allFolders = useArtifactStore(state => state.getAllFolders());
@@ -28,9 +31,10 @@ export function ArtifactGallery() {
     fetchArtifacts();
   }, [loadArtifacts]);
   
-  // Filter artifacts based on current filter settings
-  const filteredArtifacts = useMemo(() => {
-    return artifacts.filter(artifact => {
+  // Filter and sort artifacts based on current settings
+  const filteredAndSortedArtifacts = useMemo(() => {
+    // First, filter the artifacts
+    const filtered = artifacts.filter(artifact => {
       // Filter by type
       if (filterType !== 'all' && artifact.type !== filterType) {
         return false;
@@ -50,20 +54,38 @@ export function ArtifactGallery() {
         return false;
       }
       
-      // Filter by search term (title, description)
+      // Filter by search term (title, description, tags)
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const titleMatch = artifact.title.toLowerCase().includes(searchLower);
         const descMatch = artifact.description?.toLowerCase().includes(searchLower) || false;
+        const tagMatch = artifact.tags.some(tag => tag.toLowerCase().includes(searchLower));
         
-        if (!titleMatch && !descMatch) {
+        if (!titleMatch && !descMatch && !tagMatch) {
           return false;
         }
       }
       
       return true;
     });
-  }, [artifacts, filterType, filterFolder, filterTag, searchTerm]);
+    
+    // Then, sort the filtered artifacts
+    return [...filtered].sort((a, b) => {
+      // Handle different sort fields
+      if (sortBy === 'title') {
+        const titleA = a.title.toLowerCase();
+        const titleB = b.title.toLowerCase();
+        return sortOrder === 'asc' 
+          ? titleA.localeCompare(titleB)
+          : titleB.localeCompare(titleA);
+      } else {
+        // Sort by date (createdAt or updatedAt)
+        const dateA = new Date(a[sortBy]).getTime();
+        const dateB = new Date(b[sortBy]).getTime();
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+    });
+  }, [artifacts, filterType, filterFolder, filterTag, searchTerm, sortBy, sortOrder]);
 
   const handleExport = () => {
     const jsonData = exportArtifacts();
@@ -235,9 +257,9 @@ export function ArtifactGallery() {
         </div>
       )}
 
-      {filteredArtifacts.length > 0 ? (
+      {filteredAndSortedArtifacts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredArtifacts.map((artifact) => (
+          {filteredAndSortedArtifacts.map((artifact) => (
             <div key={artifact.id} className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className="p-4">
                 <div className="flex items-center mb-2">
