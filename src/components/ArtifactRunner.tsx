@@ -41,16 +41,33 @@ export function ArtifactRunner() {
         
         // Render based on artifact type
         try {
+          // Improved type validation and rendering
           if (artifactData.type === 'svg') {
-            // For SVG, we just store the code and let the SVGRenderer handle it
+            // For SVG, we directly use the SVGRenderer and don't try to transpile the code
             setRenderedComponent(<SVGRenderer code={artifactData.code} />);
           } else if (artifactData.type === 'mermaid') {
             // For Mermaid, use the MermaidRenderer component
             setRenderedComponent(<MermaidRenderer code={artifactData.code} />);
           } else {
-            // Default to React component
-            const component = executeComponentCode(artifactData.code);
-            setRenderedComponent(component);
+            // Verify if it looks like React code before trying to execute it
+            // This helps avoid transpilation errors when a type is incorrectly set
+            if (shouldProcessAsReact(artifactData.code)) {
+              // Execute as React component
+              const component = executeComponentCode(artifactData.code);
+              setRenderedComponent(component);
+            } else if (looksLikeSvg(artifactData.code)) {
+              // Fall back to SVG renderer if it looks like SVG
+              console.warn('Code appears to be SVG but was marked as React. Rendering as SVG.');
+              setRenderedComponent(<SVGRenderer code={artifactData.code} />);
+            } else if (looksLikeMermaid(artifactData.code)) {
+              // Fall back to Mermaid renderer if it looks like Mermaid
+              console.warn('Code appears to be Mermaid but was marked as React. Rendering as Mermaid.');
+              setRenderedComponent(<MermaidRenderer code={artifactData.code} />);
+            } else {
+              // Still try as React as a last resort
+              const component = executeComponentCode(artifactData.code);
+              setRenderedComponent(component);
+            }
           }
         } catch (err: any) {
           console.error('Error rendering artifact:', err);
@@ -66,6 +83,61 @@ export function ArtifactRunner() {
 
     loadArtifact();
   }, [id, getArtifact]);
+
+  // Helper functions to detect content types
+  const looksLikeSvg = (content: string): boolean => {
+    const trimmedContent = content.trim();
+    return trimmedContent.includes('<svg') || 
+           !!trimmedContent.match(/<svg\s+[^>]*>/i) ||
+           (trimmedContent.includes('<') && 
+            trimmedContent.includes('</') && 
+            (trimmedContent.includes('circle') || 
+             trimmedContent.includes('rect') || 
+             trimmedContent.includes('path') || 
+             trimmedContent.includes('polygon')));
+  };
+  
+  const looksLikeMermaid = (content: string): boolean => {
+    const trimmedContent = content.trim();
+    const mermaidPatterns = [
+      /^graph\s+[A-Za-z0-9]/i,
+      /^flowchart\s+[A-Za-z0-9]/i,
+      /^sequenceDiagram/i,
+      /^classDiagram/i,
+      /^stateDiagram/i,
+      /^erDiagram/i,
+      /^journey/i,
+      /^gantt/i,
+      /^pie/i,
+      /^mindmap/i
+    ];
+    
+    return mermaidPatterns.some(pattern => pattern.test(trimmedContent));
+  };
+  
+  const shouldProcessAsReact = (content: string): boolean => {
+    const trimmedContent = content.trim();
+    
+    // Check for clear indicators it's NOT React code
+    if (looksLikeSvg(content) || looksLikeMermaid(content)) {
+      return false;
+    }
+    
+    // Check for XML/HTML comments which cause Babel to fail
+    if (trimmedContent.includes('<!--')) {
+      return false;
+    }
+    
+    // Positive indicators it IS React code
+    return trimmedContent.includes('import React') || 
+           trimmedContent.includes('function') || 
+           trimmedContent.includes('class') || 
+           trimmedContent.includes('export default') ||
+           trimmedContent.includes('useState') ||
+           trimmedContent.includes('return') && 
+           trimmedContent.includes('<') && 
+           trimmedContent.includes('/>');
+  };
 
   // Function to execute the component code with globals
   const executeComponentCode = (code: string) => {
@@ -147,55 +219,71 @@ export function ArtifactRunner() {
         .replace(/export\s+default\s+(\w+);?/g, 'var componentToRender = $1;')
         .replace(/export\s+default\s+/g, 'var componentToRender = ');
 
-      // Transform JSX to JavaScript using Babel
-      const transformedCode = Babel.transform(processedCode, {
-        presets: ['react'],
-        filename: 'artifact.jsx' // Provide a filename to satisfy Babel
-      }).code;
+      try {
+        // Transform JSX to JavaScript using Babel
+        const transformedCode = Babel.transform(processedCode, {
+          presets: ['react'],
+          filename: 'artifact.jsx' // Provide a filename to satisfy Babel
+        }).code;
 
-      if (!transformedCode) {
-        throw new Error('Failed to transform component code');
-      }
-
-      // Create a module-like object to hold the component
-      const module = { exports: {} };
-      
-      // Wrap the code to capture the component
-      const wrappedCode = `
-        ${transformedCode}
-        
-        // Return the component (either from an explicit declaration or the last defined component)
-        if (typeof componentToRender !== 'undefined') {
-          return componentToRender;
-        } else {
-          // Try to find a React component in the code
-          // Look for function components or class components
-          var components = Object.keys(this).filter(key => {
-            var obj = this[key];
-            return typeof obj === 'function' && 
-                  (obj.prototype && obj.prototype.isReactComponent || 
-                   /return\\s+React\\.createElement/.test(obj.toString()));
-          });
-          
-          if (components.length > 0) {
-            return this[components[components.length - 1]];
-          }
-          
-          return null;
+        if (!transformedCode) {
+          throw new Error('Failed to transform component code');
         }
-      `;
-      
-      // Execute with all globals provided
-      const componentFn = new Function(...Object.keys(globals), wrappedCode);
-      const ComponentClass = componentFn.apply({}, Object.values(globals));
-      
-      // Check if we got a valid component
-      if (!ComponentClass) {
-        throw new Error('No component found in the artifact code');
+        
+        // Create a module-like object to hold the component
+        const module = { exports: {} };
+        
+        // Wrap the code to capture the component
+        const wrappedCode = `
+          ${transformedCode}
+          
+          // Return the component (either from an explicit declaration or the last defined component)
+          if (typeof componentToRender !== 'undefined') {
+            return componentToRender;
+          } else {
+            // Try to find a React component in the code
+            // Look for function components or class components
+            var components = Object.keys(this).filter(key => {
+              var obj = this[key];
+              return typeof obj === 'function' && 
+                    (obj.prototype && obj.prototype.isReactComponent || 
+                    /return\\s+React\\.createElement/.test(obj.toString()));
+            });
+            
+            if (components.length > 0) {
+              return this[components[components.length - 1]];
+            }
+            
+            return null;
+          }
+        `;
+        
+        // Execute with all globals provided
+        const componentFn = new Function(...Object.keys(globals), wrappedCode);
+        const ComponentClass = componentFn.apply({}, Object.values(globals));
+        
+        // Check if we got a valid component
+        if (!ComponentClass) {
+          throw new Error('No component found in the artifact code');
+        }
+        
+        // Return the React element
+        return React.createElement(ComponentClass);
+      } catch (err: any) {
+        // Check if this looks like it might actually be SVG or Mermaid
+        if (looksLikeSvg(code)) {
+          throw new Error('This appears to be SVG code. Try changing the artifact type to "SVG Image".');
+        } else if (looksLikeMermaid(code)) {
+          throw new Error('This appears to be Mermaid diagram code. Try changing the artifact type to "Mermaid Diagram".');
+        } else if (code.includes('<!--')) {
+          throw new Error('HTML comments (<!-- -->) are not supported in React components. If this is SVG code, change the artifact type to "SVG Image".');
+        } else {
+          // Re-throw the original error
+          throw err;
+        }
       }
-      
-      // Return the React element
-      return React.createElement(ComponentClass);
+
+      // Code was moved inside the try/catch block
     } catch (err: any) {
       console.error('Component execution error:', err);
       
@@ -308,14 +396,33 @@ export function ArtifactRunner() {
       <div className="bg-white border rounded-lg shadow-sm p-6 mb-6">
         {renderError ? (
           <div className="text-center py-8">
-            <div className="text-red-500 mb-4">Failed to render component</div>
+            <div className="text-red-500 mb-4 font-semibold text-lg">Failed to render component</div>
             <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded font-mono text-sm overflow-auto">
               {renderError}
               
+              {/* Specific error guidance */}
               {renderError.includes('lucide-react') && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded">
                   <strong>Tip:</strong> This error appears to be related to Lucide icons. Make sure you're importing icons that are available in the library.
                   <div className="mt-2">Common icons include: Image, Cpu, Lightbulb, Sparkles, Database, Smartphone, BrainCircuit, LayoutDashboard, Bot, LineChart, DollarSign</div>
+                </div>
+              )}
+              
+              {renderError.includes('SVG') && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded">
+                  <strong>Tip:</strong> This appears to be SVG code. Try changing the artifact type to "SVG Image" in the editor.
+                </div>
+              )}
+              
+              {renderError.includes('Mermaid') && (
+                <div className="mt-4 p-3 bg-purple-50 border border-purple-200 text-purple-800 rounded">
+                  <strong>Tip:</strong> This appears to be Mermaid diagram code. Try changing the artifact type to "Mermaid Diagram" in the editor.
+                </div>
+              )}
+              
+              {renderError.includes('HTML comments') && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded">
+                  <strong>Warning:</strong> HTML comments are causing issues with React transpilation. If this is SVG code, change the artifact type to "SVG Image".
                 </div>
               )}
             </div>

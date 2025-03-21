@@ -123,9 +123,15 @@ export function ArtifactEditor() {
     const detectType = (codeContent: string) => {
       const trimmedCode = codeContent.trim();
       
-      // Check for SVG - looks for <svg or opening SVG tag
+      // Check for SVG - more comprehensive detection
       if (trimmedCode.includes('<svg') || 
-          trimmedCode.match(/<svg\s+[^>]*>/i)) {
+          trimmedCode.match(/<svg\s+[^>]*>/i) ||
+          trimmedCode.includes('<!--') && // HTML comments often indicate SVG
+          (trimmedCode.includes('<rect') || 
+           trimmedCode.includes('<circle') || 
+           trimmedCode.includes('<path') || 
+           trimmedCode.includes('<g') || 
+           trimmedCode.includes('<polygon'))) {
         return 'svg' as const;
       }
       
@@ -136,10 +142,12 @@ export function ArtifactEditor() {
         /^sequenceDiagram/i,
         /^classDiagram/i,
         /^stateDiagram/i,
+        /^stateDiagram-v2/i,
         /^erDiagram/i,
         /^journey/i,
         /^gantt/i,
         /^pie/i,
+        /^pie\s+title/i,
         /^mindmap/i
       ];
       
@@ -147,14 +155,15 @@ export function ArtifactEditor() {
         return 'mermaid' as const;
       }
       
-      // Default to React if no other type is detected
       // Check for React-like syntax
-      if (trimmedCode.includes('import React') || 
-          trimmedCode.includes('function') || 
-          trimmedCode.includes('class') || 
-          trimmedCode.includes('return') || 
-          trimmedCode.includes('<div') || 
-          trimmedCode.includes('useState')) {
+      // Don't detect as React if it contains HTML comments
+      if (!trimmedCode.includes('<!--') && (
+          trimmedCode.includes('import React') || 
+          trimmedCode.includes('function') && trimmedCode.includes('return') ||
+          trimmedCode.includes('class') && trimmedCode.includes('extends') ||
+          trimmedCode.includes('useState') || 
+          trimmedCode.includes('useEffect') ||
+          trimmedCode.includes('export default'))) {
         return 'react' as const;
       }
       
