@@ -20,6 +20,7 @@ export function ArtifactEditor() {
   const [isSubfolder, setIsSubfolder] = useState(false);
   const [parentFolder, setParentFolder] = useState('');
   const [code, setCode] = useState('');
+  const [autodetectType, setAutodetectType] = useState(true);
   const [loading, setLoading] = useState(id ? true : false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -113,6 +114,59 @@ export function ArtifactEditor() {
       }
     }
   }, [folderMode, isSubfolder, parentFolder, newFolder]);
+  
+  // Detect artifact type from code content
+  useEffect(() => {
+    if (!autodetectType || !code.trim()) return;
+    
+    // Function to detect type based on code content
+    const detectType = (codeContent: string) => {
+      const trimmedCode = codeContent.trim();
+      
+      // Check for SVG - looks for <svg or opening SVG tag
+      if (trimmedCode.includes('<svg') || 
+          trimmedCode.match(/<svg\s+[^>]*>/i)) {
+        return 'svg' as const;
+      }
+      
+      // Check for Mermaid - common mermaid diagram types
+      const mermaidPatterns = [
+        /^graph\s+[A-Za-z0-9]/i,
+        /^flowchart\s+[A-Za-z0-9]/i,
+        /^sequenceDiagram/i,
+        /^classDiagram/i,
+        /^stateDiagram/i,
+        /^erDiagram/i,
+        /^journey/i,
+        /^gantt/i,
+        /^pie/i,
+        /^mindmap/i
+      ];
+      
+      if (mermaidPatterns.some(pattern => pattern.test(trimmedCode))) {
+        return 'mermaid' as const;
+      }
+      
+      // Default to React if no other type is detected
+      // Check for React-like syntax
+      if (trimmedCode.includes('import React') || 
+          trimmedCode.includes('function') || 
+          trimmedCode.includes('class') || 
+          trimmedCode.includes('return') || 
+          trimmedCode.includes('<div') || 
+          trimmedCode.includes('useState')) {
+        return 'react' as const;
+      }
+      
+      // Don't change type if we can't confidently detect it
+      return null;
+    };
+    
+    const detectedType = detectType(code);
+    if (detectedType && detectedType !== type) {
+      setType(detectedType);
+    }
+  }, [code, type, autodetectType]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -204,21 +258,52 @@ export function ArtifactEditor() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+          <div className="flex justify-between items-center mb-1">
+            <label className="text-sm font-medium text-gray-700">Type</label>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="autodetect-type"
+                checked={autodetectType}
+                onChange={(e) => setAutodetectType(e.target.checked)}
+                className="mr-2"
+              />
+              <label htmlFor="autodetect-type" className="text-xs text-gray-600">
+                Auto-detect from code
+              </label>
+            </div>
+          </div>
+          
           <select
             value={type}
             onChange={(e) => setType(e.target.value as 'react' | 'svg' | 'mermaid')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+              autodetectType ? 'bg-gray-50' : ''
+            }`}
           >
             <option value="react">React Component</option>
             <option value="svg">SVG Image</option>
             <option value="mermaid">Mermaid Diagram</option>
           </select>
-          <p className="mt-1 text-sm text-gray-500">
-            {type === 'react' && 'A React component that will be executed in the browser'}
-            {type === 'svg' && 'An SVG image defined with XML tags'}
-            {type === 'mermaid' && 'A diagram created with Mermaid syntax'}
-          </p>
+          
+          <div className="mt-1 flex items-start">
+            <div className={`h-4 w-4 mt-0.5 rounded-full ${
+              type === 'react' ? 'bg-blue-500' : 
+              type === 'svg' ? 'bg-green-500' : 
+              'bg-purple-500'
+            }`}></div>
+            <p className="ml-2 text-sm text-gray-500">
+              {type === 'react' && 'A React component that will be executed in the browser'}
+              {type === 'svg' && 'An SVG image defined with XML tags'}
+              {type === 'mermaid' && 'A diagram created with Mermaid syntax'}
+            </p>
+          </div>
+          
+          {autodetectType && (
+            <p className="mt-1 text-xs text-gray-500 italic">
+              Type will be automatically detected as you enter code
+            </p>
+          )}
         </div>
 
         <div>
@@ -377,19 +462,40 @@ export function ArtifactEditor() {
             {type === 'svg' && 'SVG Code'}
             {type === 'mermaid' && 'Mermaid Syntax'}
           </label>
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            rows={15}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono"
-            placeholder={
-              type === 'react' 
-                ? 'Paste your React component code here' 
-                : type === 'svg' 
-                  ? 'Paste your SVG code here (must include <svg> tags)'
-                  : 'Paste your Mermaid diagram syntax here'
-            }
-          />
+          <div className="relative">
+            <textarea
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              rows={15}
+              className={`w-full px-3 py-2 border-2 rounded-md shadow-sm focus:outline-none focus:ring-0 font-mono ${
+                type === 'react' 
+                  ? 'border-blue-200 focus:border-blue-500' 
+                  : type === 'svg' 
+                    ? 'border-green-200 focus:border-green-500'
+                    : 'border-purple-200 focus:border-purple-500'
+              }`}
+              placeholder={
+                type === 'react' 
+                  ? 'Paste your React component code here' 
+                  : type === 'svg' 
+                    ? 'Paste your SVG code here (must include <svg> tags)'
+                    : 'Paste your Mermaid diagram syntax here'
+              }
+            />
+            {autodetectType && code && (
+              <div className="absolute top-3 right-3">
+                <div className={`px-2 py-1 rounded text-xs text-white ${
+                  type === 'react' ? 'bg-blue-500' : 
+                  type === 'svg' ? 'bg-green-500' : 
+                  'bg-purple-500'
+                }`}>
+                  {type === 'react' && 'React'}
+                  {type === 'svg' && 'SVG'}
+                  {type === 'mermaid' && 'Mermaid'}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
