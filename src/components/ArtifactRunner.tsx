@@ -13,13 +13,14 @@ import { MermaidRenderer } from './renderers/MermaidRenderer';
 export function ArtifactRunner() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getArtifact } = useArtifactStore();
+  const { getArtifact, deleteArtifact } = useArtifactStore();
   
   const [artifact, setArtifact] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [renderedComponent, setRenderedComponent] = useState<React.ReactNode>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const loadArtifact = async () => {
@@ -137,6 +138,19 @@ export function ArtifactRunner() {
            trimmedContent.includes('return') && 
            trimmedContent.includes('<') && 
            trimmedContent.includes('/>');
+  };
+
+  // Handle artifact deletion
+  const handleDeleteArtifact = async () => {
+    if (!id) return;
+    
+    try {
+      await deleteArtifact(id);
+      navigate('/'); // Redirect to gallery after deletion
+    } catch (err) {
+      console.error('Error deleting artifact:', err);
+      alert('Failed to delete artifact');
+    }
   };
 
   // Function to execute the component code with globals
@@ -369,6 +383,12 @@ export function ArtifactRunner() {
             Edit
           </button>
           <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+          >
+            Delete
+          </button>
+          <button
             onClick={() => navigate('/')}
             className="border border-gray-300 hover:bg-gray-100 px-3 py-1 rounded text-sm"
           >
@@ -466,6 +486,32 @@ export function ArtifactRunner() {
           </pre>
         </div>
       </div>
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold mb-4">Delete Artifact</h3>
+            <p className="mb-6">
+              Are you sure you want to delete <span className="font-semibold">{artifact?.title}</span>? 
+              This action cannot be undone.
+            </p>
+            <div className="flex space-x-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteArtifact}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
