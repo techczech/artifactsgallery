@@ -1,1 +1,29 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/claudeartifacts/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="Web site created using create-react-app"/><link rel="apple-touch-icon" href="/claudeartifacts/logo192.png"/><link rel="manifest" href="/claudeartifacts/manifest.json"/><title>React App</title><script defer="defer" src="/claudeartifacts/static/js/main.7bf7afb3.js"></script><link href="/claudeartifacts/static/css/main.e6c13ad2.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/artifacts-gallery/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Artifacts Gallery - Organize and Run Claude AI Artifacts</title>
+    <script>
+      // Check if we have a redirect stored from 404.html
+      (function() {
+        const redirect = sessionStorage.getItem('redirect');
+        if (redirect && redirect !== '/') {
+          // Clear the redirect
+          sessionStorage.removeItem('redirect');
+          // Push the path to history for React Router to handle
+          const baseTag = document.querySelector('base');
+          const baseUrl = baseTag ? baseTag.getAttribute('href') || '/' : '/';
+          const cleanRedirect = redirect.replace(baseUrl, '/');
+          window.history.pushState(null, null, cleanRedirect);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/artifacts-gallery/assets/index-DwNCCrEn.js"></script>
+    <link rel="stylesheet" crossorigin href="/artifacts-gallery/assets/index-CT9N-NJD.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
