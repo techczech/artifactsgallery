@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useArtifactStore } from '../lib/store';
+import { Folder, Home, ChevronRight } from 'lucide-react';
 
 export function ArtifactGallery() {
   const { artifacts, loadArtifacts, exportArtifacts, importArtifacts } = useArtifactStore();
@@ -11,6 +12,11 @@ export function ArtifactGallery() {
   // Filtering and sorting state
   const [filterType, setFilterType] = useState<'react' | 'svg' | 'mermaid' | 'all'>('all');
   const [filterFolder, setFilterFolder] = useState<string | 'all'>('all');
+  
+  // Folder navigation state
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentFolder = searchParams.get('folder') || '';
+  const navigate = useNavigate();
   const [filterTag, setFilterTag] = useState<string | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'updatedAt' | 'createdAt' | 'title'>('updatedAt');
@@ -31,22 +37,92 @@ export function ArtifactGallery() {
     fetchArtifacts();
   }, [loadArtifacts]);
   
-  // Filter and sort artifacts based on current settings
+  // Get folders and subfolders for the current navigation
+  const { foldersInCurrentPath, subFolders, currentFolderArtifacts } = useMemo(() => {
+    // Extract all unique folders
+    const allFolderPaths = new Set<string>();
+    
+    // Track which folders are in the current path
+    const foldersInPath: string[] = [];
+    if (currentFolder) {
+      // Split the current folder path and add each level
+      const folderParts = currentFolder.split('/');
+      let path = '';
+      
+      for (const part of folderParts) {
+        if (path) {
+          path += '/' + part;
+        } else {
+          path = part;
+        }
+        foldersInPath.push(path);
+      }
+    }
+    
+    // Find direct subfolders of the current folder
+    const subFoldersSet = new Set<string>();
+    
+    // Track artifacts in the current folder
+    const artifactsInFolder: typeof artifacts = [];
+    
+    // Process all artifacts
+    artifacts.forEach(artifact => {
+      if (!artifact.folder) return;
+      
+      // Normalize folder path to use consistent separators
+      const normalizedFolder = artifact.folder.replace(/\\/g, '/');
+      allFolderPaths.add(normalizedFolder);
+      
+      // Check if this artifact is in the current folder
+      const isInCurrentFolder = !currentFolder 
+        ? !normalizedFolder.includes('/') // If at root, only show top-level folders
+        : normalizedFolder.startsWith(currentFolder + '/') || normalizedFolder === currentFolder;
+        
+      if (isInCurrentFolder) {
+        // If exactly in this folder (not in a subfolder)
+        if (normalizedFolder === currentFolder) {
+          artifactsInFolder.push(artifact);
+        }
+        // Extract direct subfolders
+        else if (normalizedFolder.startsWith(currentFolder + '/')) {
+          const remaining = normalizedFolder.substring(currentFolder.length + 1);
+          const nextLevel = remaining.split('/')[0];
+          if (nextLevel) {
+            const subFolderPath = currentFolder ? `${currentFolder}/${nextLevel}` : nextLevel;
+            subFoldersSet.add(subFolderPath);
+          }
+        }
+      }
+    });
+    
+    // For root level (no current folder), find all top-level folders
+    if (!currentFolder) {
+      artifacts.forEach(artifact => {
+        if (!artifact.folder) {
+          artifactsInFolder.push(artifact);
+        } else {
+          const normalizedFolder = artifact.folder.replace(/\\/g, '/');
+          if (!normalizedFolder.includes('/')) {
+            subFoldersSet.add(normalizedFolder);
+          }
+        }
+      });
+    }
+    
+    return {
+      foldersInCurrentPath: foldersInPath,
+      subFolders: Array.from(subFoldersSet).sort(),
+      currentFolderArtifacts: artifactsInFolder
+    };
+  }, [artifacts, currentFolder]);
+
+  // Apply additional filters and sorting to artifacts in current folder
   const filteredAndSortedArtifacts = useMemo(() => {
-    // First, filter the artifacts
-    const filtered = artifacts.filter(artifact => {
+    // Filter artifacts based on other criteria (except folder which is handled by navigation)
+    const filtered = currentFolderArtifacts.filter(artifact => {
       // Filter by type
       if (filterType !== 'all' && artifact.type !== filterType) {
         return false;
-      }
-      
-      // Filter by folder
-      if (filterFolder !== 'all') {
-        if (filterFolder === '<No Folder>' && artifact.folder) {
-          return false;
-        } else if (filterFolder !== '<No Folder>' && artifact.folder !== filterFolder) {
-          return false;
-        }
       }
       
       // Filter by tag
@@ -54,7 +130,7 @@ export function ArtifactGallery() {
         return false;
       }
       
-      // Filter by search term (title, description, tags)
+      // Filter by search term
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const titleMatch = artifact.title.toLowerCase().includes(searchLower);
@@ -85,7 +161,7 @@ export function ArtifactGallery() {
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
       }
     });
-  }, [artifacts, filterType, filterFolder, filterTag, searchTerm, sortBy, sortOrder]);
+  }, [currentFolderArtifacts, filterType, filterTag, searchTerm, sortBy, sortOrder]);
 
   const handleExport = () => {
     const jsonData = exportArtifacts();
@@ -105,6 +181,31 @@ export function ArtifactGallery() {
     fileInputRef.current?.click();
   };
 
+  // Navigation functions
+  const navigateToFolder = (folderPath: string) => {
+    setSearchParams(folderPath ? { folder: folderPath } : {});
+    
+    // Reset other filters when navigating
+    setFilterType('all');
+    setFilterTag('all');
+    setSearchTerm('');
+  };
+  
+  const navigateToParentFolder = () => {
+    if (!currentFolder) return;
+    
+    const parts = currentFolder.split('/');
+    if (parts.length <= 1) {
+      // If at top level, go to root
+      setSearchParams({});
+    } else {
+      // Go up one level
+      parts.pop();
+      const parentPath = parts.join('/');
+      setSearchParams(parentPath ? { folder: parentPath } : {});
+    }
+  };
+  
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -166,6 +267,31 @@ export function ArtifactGallery() {
             className="hidden" 
           />
         </div>
+      </div>
+      
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center mb-4 bg-gray-50 px-4 py-2 rounded border overflow-x-auto">
+        <button 
+          onClick={() => navigateToFolder('')}
+          className="flex items-center text-blue-600 hover:text-blue-800"
+        >
+          <Home size={16} className="mr-1" />
+          <span>Home</span>
+        </button>
+        
+        {foldersInCurrentPath.map((folder, index) => (
+          <div key={folder} className="flex items-center">
+            <ChevronRight size={16} className="mx-2 text-gray-400" />
+            <button 
+              onClick={() => navigateToFolder(folder)}
+              className={`flex items-center ${index === foldersInCurrentPath.length - 1 
+                ? 'font-semibold text-gray-800' 
+                : 'text-blue-600 hover:text-blue-800'}`}
+            >
+              {folder.split('/').pop()}
+            </button>
+          </div>
+        ))}
       </div>
       
       {/* Filters */}
@@ -257,6 +383,56 @@ export function ArtifactGallery() {
         </div>
       )}
 
+      {/* Folders */}
+      {subFolders.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-medium mb-3">Folders</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {subFolders.map((folderPath) => {
+              const folderName = folderPath.split('/').pop();
+              return (
+                <button
+                  key={folderPath}
+                  onClick={() => navigateToFolder(folderPath)}
+                  className="flex items-center p-3 border rounded bg-white hover:bg-blue-50 transition-colors text-left"
+                >
+                  <Folder size={20} className="mr-2 text-blue-500" />
+                  <span className="font-medium">{folderName}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* Artifacts */}
+      <div className="mb-3 flex justify-between items-center">
+        <h2 className="text-lg font-medium">
+          {currentFolder ? 'Artifacts in this folder' : 'Artifacts without folder'}
+        </h2>
+        
+        {/* Sorting controls (can be expanded later) */}
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'updatedAt' | 'createdAt' | 'title')}
+            className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="updatedAt">Sort by: Last Updated</option>
+            <option value="createdAt">Sort by: Created</option>
+            <option value="title">Sort by: Title</option>
+          </select>
+          
+          <button 
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="p-1.5 border rounded hover:bg-gray-100"
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
+        </div>
+      </div>
+      
       {filteredAndSortedArtifacts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredAndSortedArtifacts.map((artifact) => (
@@ -329,6 +505,26 @@ export function ArtifactGallery() {
                 Create Your First Artifact
               </Link>
             </>
+          ) : subFolders.length > 0 && filteredAndSortedArtifacts.length === 0 && !searchTerm && filterType === 'all' && filterTag === 'all' ? (
+            <>
+              <p className="text-gray-600 mb-2">This folder contains subfolders but no direct artifacts</p>
+              <p className="text-gray-500 text-sm mb-4">Navigate into a subfolder to view its contents</p>
+            </>
+          ) : currentFolder && filteredAndSortedArtifacts.length === 0 && !searchTerm && filterType === 'all' && filterTag === 'all' ? (
+            <>
+              <p className="text-gray-600 mb-2">This folder is empty</p>
+              <div className="flex space-x-2 mt-4">
+                <Link to="/create" className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                  Create New Artifact
+                </Link>
+                <button
+                  onClick={navigateToParentFolder}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                >
+                  Go Back
+                </button>
+              </div>
+            </>
           ) : (
             <>
               <p className="text-gray-600 mb-2">No artifacts match your filters</p>
@@ -336,7 +532,6 @@ export function ArtifactGallery() {
               <button
                 onClick={() => {
                   setFilterType('all');
-                  setFilterFolder('all');
                   setFilterTag('all');
                   setSearchTerm('');
                 }}
