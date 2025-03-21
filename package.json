@@ -1,12 +1,12 @@
 {
-  "name": "artifact-viewer",
+  "name": "artifacts-gallery",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://yourusername.github.io/claude-artifact-runner",
+  "homepage": "https://techczech.github.io/artifacts-gallery",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/claude-artifact-runner.git"
+    "url": "https://github.com/techczech/artifacts-gallery.git"
   },
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist -u \"Your Name <your.email@example.com>\""
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@babel/standalone": "^7.26.10",
