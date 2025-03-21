@@ -44,7 +44,7 @@ export function SVGRenderer({ code, className = '' }: SVGRendererProps) {
     }
   }, [code]);
 
-  // Function to copy SVG as image to clipboard
+  // More reliable way to copy SVG as image to clipboard
   const copySvgAsImage = async () => {
     try {
       const svgElement = svgContainerRef.current?.querySelector('svg');
@@ -52,68 +52,99 @@ export function SVGRenderer({ code, className = '' }: SVGRendererProps) {
         throw new Error('SVG element not found');
       }
 
-      // Get SVG data as string
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-
-      try {
-        // Try using the modern Clipboard API
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            'image/svg+xml': svgBlob
-          })
-        ]);
-        setCopyStatus('SVG copied to clipboard!');
-      } catch (clipboardErr) {
-        // Fallback to image conversion if direct SVG copy fails
-        const img = new Image();
-        const url = URL.createObjectURL(svgBlob);
-        
-        img.onload = async () => {
-          // Create a canvas and draw the SVG
-          const canvas = document.createElement('canvas');
-          const svgSize = svgElement.getBoundingClientRect();
-          canvas.width = svgSize.width || svgElement.width.baseVal.value || 300;
-          canvas.height = svgSize.height || svgElement.height.baseVal.value || 150;
-          
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Failed to get canvas context');
-          
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          
-          try {
-            // Try to copy the canvas as an image
-            canvas.toBlob(async (blob) => {
-              if (blob) {
-                await navigator.clipboard.write([
-                  new ClipboardItem({ 'image/png': blob })
-                ]);
-                setCopyStatus('Image copied to clipboard!');
-              } else {
-                throw new Error('Failed to create image');
-              }
-            });
-          } catch (canvasErr) {
-            setCopyStatus('Copy failed. Try downloading instead.');
-            console.error('Canvas copy error:', canvasErr);
-          }
-          
-          URL.revokeObjectURL(url);
-        };
-        
-        img.src = url;
+      // Create a canvas with appropriate dimensions
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas context not available');
       }
+
+      // Get SVG dimensions
+      let width = svgElement.width?.baseVal?.value;
+      let height = svgElement.height?.baseVal?.value;
+      
+      if (!width || !height) {
+        // Try to get dimensions from viewBox
+        const viewBox = svgElement.viewBox?.baseVal;
+        if (viewBox) {
+          width = viewBox.width;
+          height = viewBox.height;
+        }
+      }
+      
+      if (!width || !height) {
+        // Fallback to getBoundingClientRect
+        const bbox = svgElement.getBoundingClientRect();
+        width = bbox.width;
+        height = bbox.height;
+      }
+      
+      // Ensure minimum dimensions
+      width = Math.max(width || 0, 100);
+      height = Math.max(height || 0, 100);
+      
+      // Scale for better quality
+      const scale = 2;
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      
+      // Create a blob from the SVG string
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      // Load the SVG as an image
+      const img = new Image();
+      img.src = url;
+      
+      // Draw the image to canvas when loaded
+      img.onload = async () => {
+        // Fill with white background for better visibility
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw the SVG image
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        
+        try {
+          // Convert to PNG blob and copy to clipboard
+          canvas.toBlob(async (pngBlob) => {
+            if (pngBlob) {
+              try {
+                // Try the clipboard item approach
+                const clipboardItem = new ClipboardItem({ 'image/png': pngBlob });
+                await navigator.clipboard.write([clipboardItem]);
+                setCopyStatus('Image copied to clipboard!');
+              } catch (clipErr) {
+                console.error('Clipboard API error:', clipErr);
+                setCopyStatus('Copy failed - browser may not support clipboard images');
+              }
+            } else {
+              setCopyStatus('Failed to create PNG data');
+            }
+          }, 'image/png');
+        } catch (err) {
+          console.error('Canvas to Blob error:', err);
+          setCopyStatus('Copy failed due to browser limitations');
+        }
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setCopyStatus('Failed to load SVG as image');
+      };
       
       // Clear the status after 3 seconds
       setTimeout(() => setCopyStatus(''), 3000);
     } catch (err) {
       console.error('Error copying SVG:', err);
-      setCopyStatus('Failed to copy SVG');
+      setCopyStatus('Failed to copy image. Try download instead.');
       setTimeout(() => setCopyStatus(''), 3000);
     }
   };
 
-  // Function to download SVG as PNG
+  // Improved SVG to PNG download
   const downloadSvgAsPng = () => {
     try {
       const svgElement = svgContainerRef.current?.querySelector('svg');
@@ -121,38 +152,76 @@ export function SVGRenderer({ code, className = '' }: SVGRendererProps) {
         throw new Error('SVG element not found');
       }
 
-      // Get SVG data
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-      const url = URL.createObjectURL(svgBlob);
+      // Create a canvas with appropriate dimensions
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas context not available');
+      }
+
+      // Get SVG dimensions
+      let width = svgElement.width?.baseVal?.value;
+      let height = svgElement.height?.baseVal?.value;
       
-      // Create an image from the SVG
+      if (!width || !height) {
+        // Try to get dimensions from viewBox
+        const viewBox = svgElement.viewBox?.baseVal;
+        if (viewBox) {
+          width = viewBox.width;
+          height = viewBox.height;
+        }
+      }
+      
+      if (!width || !height) {
+        // Fallback to getBoundingClientRect
+        const bbox = svgElement.getBoundingClientRect();
+        width = bbox.width;
+        height = bbox.height;
+      }
+      
+      // Ensure minimum dimensions
+      width = Math.max(width || 0, 100);
+      height = Math.max(height || 0, 100);
+      
+      // Scale for better quality
+      const scale = 2;
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      
+      // Create a blob from the SVG string
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      // Load the SVG as an image
       const img = new Image();
-      img.onload = function() {
-        // Create canvas
-        const canvas = document.createElement('canvas');
-        const svgSize = svgElement.getBoundingClientRect();
-        canvas.width = svgSize.width || svgElement.width.baseVal.value || 300;
-        canvas.height = svgSize.height || svgElement.height.baseVal.value || 150;
+      img.src = url;
+      
+      // Draw the image to canvas when loaded
+      img.onload = () => {
+        // Fill with white background for better visibility
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Draw SVG to canvas
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Failed to get canvas context');
-        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Draw the SVG image
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
         
-        // Convert to PNG and download
-        const pngUrl = canvas.toDataURL('image/png');
+        // Convert to data URL and download
+        const imgURL = canvas.toDataURL('image/png');
         const a = document.createElement('a');
-        a.href = pngUrl;
-        a.download = 'svg-diagram.png';
+        a.href = imgURL;
+        a.download = 'svg-image.png';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        
-        URL.revokeObjectURL(url);
       };
       
-      img.src = url;
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setCopyStatus('Failed to load SVG as image');
+        setTimeout(() => setCopyStatus(''), 3000);
+      };
     } catch (err) {
       console.error('Error downloading SVG as PNG:', err);
       setCopyStatus('Failed to download as PNG');
@@ -168,19 +237,19 @@ export function SVGRenderer({ code, className = '' }: SVGRendererProps) {
         throw new Error('SVG element not found');
       }
 
-      // Get SVG data
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-      const url = URL.createObjectURL(svgBlob);
+      // Get SVG data with correct XML declaration
+      const svgData = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + 
+                      new XMLSerializer().serializeToString(svgElement);
       
       // Create download link
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'diagram.svg';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error downloading SVG:', err);
