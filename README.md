@@ -15,6 +15,7 @@ Artifacts Gallery allows you to:
 4. **Filter and search** to find exactly what you need
 5. **Import and export** your artifact collections
 6. **Auto-detect** artifact types based on content
+7. **Manage artifacts** with edit and delete functionality
 
 ![ArtifactVault Screenshot](./screenshot.png)
 
@@ -28,6 +29,7 @@ The original project was substantially extended with:
 - Advanced filtering and search
 - Improved user interface
 - Automatic type detection
+- Artifact management features
 
 This project maintains the MIT License of the original work.
 
@@ -42,6 +44,8 @@ This project maintains the MIT License of the original work.
 - **Import/Export**: Share collections with others via JSON files
 - **GitHub Pages Compatibility**: Works both locally and when deployed
 - **Smart Type Detection**: Automatically detects the correct artifact type based on content
+- **Download Options**: Download SVG diagrams directly
+- **Complete Management**: Edit and delete artifacts as needed
 
 ## Recent Improvements
 
@@ -68,6 +72,15 @@ This project maintains the MIT License of the original work.
 - Proper handling of HTML comments in SVG
 - Graceful fallback for incorrectly typed content
 - Helpful error messages when issues occur
+
+### 5. Image Export Options
+- Download SVG diagrams in their original format
+- Copy and download functionality for diagram sharing
+
+### 6. Delete Functionality
+- Delete button in the artifact view
+- Confirmation dialog to prevent accidental deletions
+- Redirect to gallery after successful deletion
 
 ## How Artifacts Gallery Works
 
@@ -115,6 +128,24 @@ The application uses various technologies to render different types of content:
 7. Click "Save Artifact"
 8. The artifact will be rendered in the view page
 
+## Artifact Management
+
+### Viewing Artifacts
+- Navigate to an artifact to see it rendered
+- View the code used to create it
+- Access download, edit, and delete options
+
+### Editing Artifacts
+- Modify title, description, tags, and folder
+- Change the artifact type if needed
+- Update the code with new content
+- Preview changes before saving
+
+### Deleting Artifacts
+- Delete button in the artifact view screen
+- Confirmation dialog prevents accidental deletions
+- Navigate back to gallery after deletion
+
 ## Organization and Filtering
 
 ### Folder Navigation
@@ -131,8 +162,9 @@ The application uses various technologies to render different types of content:
 ### Search and Filtering
 - Filter artifacts by type (React, SVG, Mermaid)
 - Filter by tags or folders
-- Search by title or description
+- Search by title, description, or tags
 - Combine filters for precise results
+- Sort artifacts by various criteria
 
 ## Example Content
 
