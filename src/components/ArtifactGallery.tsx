@@ -122,7 +122,7 @@ export function ArtifactGallery() {
     <div className="p-4 max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center">
-          <h1 className="text-2xl font-bold">ArtifactVault</h1>
+          <h1 className="text-2xl font-bold">Artifacts Gallery</h1>
           <Link 
             to="/about" 
             className="ml-4 text-blue-600 hover:text-blue-800 text-sm underline underline-offset-2"
