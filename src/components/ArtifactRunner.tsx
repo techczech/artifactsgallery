@@ -6,6 +6,9 @@ import * as LucideIcons from 'lucide-react';
 import * as Recharts from 'recharts';
 // Import Babel for JSX transpilation
 import * as Babel from '@babel/standalone';
+// Import libraries for new artifact types
+import * as Plotly from 'plotly.js';
+import * as XLSX from 'xlsx';
 // Import renderers
 import { SVGRenderer } from './renderers/SVGRenderer';
 import { MermaidRenderer } from './renderers/MermaidRenderer';
@@ -21,6 +24,50 @@ export function ArtifactRunner() {
   const [renderedComponent, setRenderedComponent] = useState<React.ReactNode>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [threeJsLoaded, setThreeJsLoaded] = useState(!!window.THREE);
+
+  // Load Three.js from CDN
+  useEffect(() => {
+    if (!threeJsLoaded) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('Three.js loaded from CDN');
+        setThreeJsLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Three.js from CDN');
+        // Potentially set an error state here if Three.js is critical for all artifacts
+      };
+      document.head.appendChild(script);
+
+      return () => {
+        // Clean up the script tag if the component unmounts before loading
+        document.head.removeChild(script);
+      };
+    }
+  }, [threeJsLoaded]);
+
+  // Mock window.fs.readFile if not present (for local dev)
+  useEffect(() => {
+    if (typeof window.fs === 'undefined') {
+      console.warn('window.fs is undefined. Mocking for local development.');
+      window.fs = {
+        readFile: (path, options, callback) => {
+          const error = new Error(`Mock fs.readFile: File not found - ${path}. This is a mock for local development. In a Claude environment, actual file reading would occur.`);
+          console.error(error);
+          if (typeof options === 'function') { // If options are omitted
+            options(error, null);
+          } else if (callback) {
+            callback(error, null);
+          }
+        },
+        // Add other fs methods if needed by artifacts, though unlikely for readFile only cases
+      };
+    }
+  }, []);
+
 
   useEffect(() => {
     const loadArtifact = async () => {
@@ -44,34 +91,62 @@ export function ArtifactRunner() {
         try {
           // Improved type validation and rendering
           if (artifactData.type === 'svg') {
-            // For SVG, we directly use the SVGRenderer and don't try to transpile the code
             setRenderedComponent(<SVGRenderer code={artifactData.code} />);
           } else if (artifactData.type === 'mermaid') {
-            // For Mermaid, use the MermaidRenderer component
             setRenderedComponent(<MermaidRenderer code={artifactData.code} />);
-          } else {
-            // Verify if it looks like React code before trying to execute it
-            // This helps avoid transpilation errors when a type is incorrectly set
+          } else if (artifactData.type === 'plotly') {
+            try {
+                const component = executeComponentCode(artifactData.code);
+                setRenderedComponent(component);
+            } catch (err: any) {
+                console.error('Error rendering Plotly artifact:', err);
+                setRenderError(err.message || 'Failed to render Plotly artifact');
+            }
+          } else if (artifactData.type === 'sheetjs') {
+            try {
+                const component = executeComponentCode(artifactData.code);
+                setRenderedComponent(component);
+            } catch (err: any) {
+                console.error('Error rendering SheetJS artifact:', err);
+                setRenderError(err.message || 'Failed to render SheetJS artifact');
+            }
+          } else if (artifactData.type === 'threejs') {
+            try {
+                if (threeJsLoaded && window.THREE) { // Ensure THREE is loaded
+                    const component = executeComponentCode(artifactData.code);
+                    setRenderedComponent(component);
+                } else if (!threeJsLoaded) {
+                    // Three.js is still loading, wait for it.
+                    // This might require a re-render trigger once threeJsLoaded is true.
+                    // The useEffect dependency on threeJsLoaded should handle this.
+                    console.log('Three.js is loading, deferring component execution...');
+                    setRenderError('Three.js is loading. Please wait...'); // Temporary message
+                    // Optional: set up a listener or check in interval if component load needs to be re-triggered
+                }
+                 else {
+                    throw new Error('Three.js library is not loaded yet or failed to load.');
+                }
+            } catch (err: any) {
+                console.error('Error rendering Three.js artifact:', err);
+                setRenderError(err.message || 'Failed to render Three.js artifact');
+            }
+          } else { // Default to React component execution
             if (shouldProcessAsReact(artifactData.code)) {
-              // Execute as React component
               const component = executeComponentCode(artifactData.code);
               setRenderedComponent(component);
             } else if (looksLikeSvg(artifactData.code)) {
-              // Fall back to SVG renderer if it looks like SVG
               console.warn('Code appears to be SVG but was marked as React. Rendering as SVG.');
               setRenderedComponent(<SVGRenderer code={artifactData.code} />);
             } else if (looksLikeMermaid(artifactData.code)) {
-              // Fall back to Mermaid renderer if it looks like Mermaid
               console.warn('Code appears to be Mermaid but was marked as React. Rendering as Mermaid.');
               setRenderedComponent(<MermaidRenderer code={artifactData.code} />);
             } else {
-              // Still try as React as a last resort
               const component = executeComponentCode(artifactData.code);
               setRenderedComponent(component);
             }
           }
         } catch (err: any) {
-          console.error('Error rendering artifact:', err);
+          console.error('Error rendering artifact (outer catch):', err);
           setRenderError(err.message || 'Failed to render artifact');
         }
       } catch (err) {
@@ -83,7 +158,7 @@ export function ArtifactRunner() {
     };
 
     loadArtifact();
-  }, [id, getArtifact]);
+  }, [id, getArtifact, threeJsLoaded]); // Added threeJsLoaded as a dependency
 
   // Helper functions to detect content types
   const looksLikeSvg = (content: string): boolean => {
@@ -170,6 +245,9 @@ export function ArtifactRunner() {
       
       // Add Recharts components
       ...Recharts,
+      Plotly,
+      XLSX,
+      THREE: window.THREE, // Use the globally loaded THREE
       
       // Extract potential Lucide icon imports from the code to ensure they're available
       ...extractLucideIconImports(code)
@@ -361,11 +439,22 @@ export function ArtifactRunner() {
                 ? 'bg-blue-100 text-blue-800' 
                 : artifact?.type === 'svg' 
                   ? 'bg-green-100 text-green-800' 
-                  : 'bg-purple-100 text-purple-800'
+                  : artifact?.type === 'mermaid'
+                    ? 'bg-purple-100 text-purple-800'
+                    : artifact?.type === 'plotly'
+                      ? 'bg-red-100 text-red-800'
+                      : artifact?.type === 'sheetjs'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : artifact?.type === 'threejs'
+                          ? 'bg-pink-100 text-pink-800'
+                          : 'bg-gray-100 text-gray-800' // Default
             }`}>
               {artifact?.type === 'react' && 'React'}
               {artifact?.type === 'svg' && 'SVG'}
               {artifact?.type === 'mermaid' && 'Mermaid'}
+              {artifact?.type === 'plotly' && 'Plotly'}
+              {artifact?.type === 'sheetjs' && 'SheetJS'}
+              {artifact?.type === 'threejs' && 'Three.js'}
             </span>
             
             {artifact?.folder && (

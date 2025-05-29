@@ -10,7 +10,7 @@ export function ArtifactEditor() {
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<'react' | 'svg' | 'mermaid'>('react');
+  const [type, setType] = useState<'react' | 'svg' | 'mermaid' | 'plotly' | 'sheetjs' | 'threejs'>('react');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [folder, setFolder] = useState('');
@@ -154,6 +154,31 @@ export function ArtifactEditor() {
       if (mermaidPatterns.some(pattern => pattern.test(trimmedCode))) {
         return 'mermaid' as const;
       }
+
+      // Check for Plotly
+      if (trimmedCode.includes('"data": [') && trimmedCode.includes('"layout": {') || 
+          trimmedCode.includes('Plotly.newPlot') ||
+          trimmedCode.includes('Plotly.react')) {
+        return 'plotly' as const;
+      }
+
+      // Check for SheetJS
+      if (trimmedCode.includes('XLSX.read') || 
+          trimmedCode.includes('XLSX.utils.sheet_to_json') ||
+          trimmedCode.includes("require('xlsx')") || // CommonJS
+          trimmedCode.includes("from 'xlsx'") // ES6 modules
+          ) {
+        return 'sheetjs' as const;
+      }
+
+      // Check for Three.js
+      if (trimmedCode.includes('new THREE.Scene()') || 
+          trimmedCode.includes('THREE.WebGLRenderer') ||
+          trimmedCode.includes('import * as THREE') ||
+          trimmedCode.includes("from 'three'") // ES6 modules
+          ) {
+        return 'threejs' as const;
+      }
       
       // Check for React-like syntax
       // Don't detect as React if it contains HTML comments
@@ -285,7 +310,7 @@ export function ArtifactEditor() {
           
           <select
             value={type}
-            onChange={(e) => setType(e.target.value as 'react' | 'svg' | 'mermaid')}
+            onChange={(e) => setType(e.target.value as 'react' | 'svg' | 'mermaid' | 'plotly' | 'sheetjs' | 'threejs')}
             className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
               autodetectType ? 'bg-gray-50' : ''
             }`}
@@ -293,18 +318,28 @@ export function ArtifactEditor() {
             <option value="react">React Component</option>
             <option value="svg">SVG Image</option>
             <option value="mermaid">Mermaid Diagram</option>
+            <option value="plotly">Plotly Chart</option>
+            <option value="sheetjs">SheetJS (Excel)</option>
+            <option value="threejs">Three.js Scene</option>
           </select>
           
           <div className="mt-1 flex items-start">
             <div className={`h-4 w-4 mt-0.5 rounded-full ${
               type === 'react' ? 'bg-blue-500' : 
               type === 'svg' ? 'bg-green-500' : 
-              'bg-purple-500'
+              type === 'mermaid' ? 'bg-purple-500' :
+              type === 'plotly' ? 'bg-red-500' :
+              type === 'sheetjs' ? 'bg-yellow-500' :
+              type === 'threejs' ? 'bg-pink-500' :
+              'bg-gray-500' // Default color
             }`}></div>
             <p className="ml-2 text-sm text-gray-500">
               {type === 'react' && 'A React component that will be executed in the browser'}
               {type === 'svg' && 'An SVG image defined with XML tags'}
               {type === 'mermaid' && 'A diagram created with Mermaid syntax'}
+              {type === 'plotly' && 'A Plotly JSON chart definition or a React component using Plotly.'}
+              {type === 'sheetjs' && 'JavaScript code using SheetJS to process and display Excel files (expects `window.fs.readFile` for file access).'}
+              {type === 'threejs' && 'A Three.js scene setup script or a React component using Three.js.'}
             </p>
           </div>
           
@@ -470,6 +505,9 @@ export function ArtifactEditor() {
             {type === 'react' && 'Component Code'}
             {type === 'svg' && 'SVG Code'}
             {type === 'mermaid' && 'Mermaid Syntax'}
+            {type === 'plotly' && 'Plotly JSON / Code'}
+            {type === 'sheetjs' && 'SheetJS Code'}
+            {type === 'threejs' && 'Three.js Code'}
           </label>
           <div className="relative">
             <textarea
@@ -481,14 +519,30 @@ export function ArtifactEditor() {
                   ? 'border-blue-200 focus:border-blue-500' 
                   : type === 'svg' 
                     ? 'border-green-200 focus:border-green-500'
-                    : 'border-purple-200 focus:border-purple-500'
+                    : type === 'mermaid'
+                      ? 'border-purple-200 focus:border-purple-500'
+                      : type === 'plotly'
+                        ? 'border-red-200 focus:border-red-500'
+                        : type === 'sheetjs'
+                          ? 'border-yellow-200 focus:border-yellow-500'
+                          : type === 'threejs'
+                            ? 'border-pink-200 focus:border-pink-500'
+                            : 'border-gray-200 focus:border-gray-500'
               }`}
               placeholder={
                 type === 'react' 
                   ? 'Paste your React component code here' 
                   : type === 'svg' 
                     ? 'Paste your SVG code here (must include <svg> tags)'
-                    : 'Paste your Mermaid diagram syntax here'
+                    : type === 'mermaid'
+                      ? 'Paste your Mermaid diagram syntax here'
+                      : type === 'plotly'
+                        ? 'Paste your Plotly JSON or React component code here.'
+                        : type === 'sheetjs'
+                          ? 'Write your SheetJS script here (e.g., using XLSX.read with window.fs.readFile).'
+                          : type === 'threejs'
+                            ? 'Paste your Three.js scene setup code or React component here.'
+                            : 'Enter your code here'
               }
             />
             {autodetectType && code && (
@@ -496,11 +550,18 @@ export function ArtifactEditor() {
                 <div className={`px-2 py-1 rounded text-xs text-white ${
                   type === 'react' ? 'bg-blue-500' : 
                   type === 'svg' ? 'bg-green-500' : 
-                  'bg-purple-500'
+                  type === 'mermaid' ? 'bg-purple-500' :
+                  type === 'plotly' ? 'bg-red-500' :
+                  type === 'sheetjs' ? 'bg-yellow-500' :
+                  type === 'threejs' ? 'bg-pink-500' :
+                  'bg-gray-500'
                 }`}>
                   {type === 'react' && 'React'}
                   {type === 'svg' && 'SVG'}
                   {type === 'mermaid' && 'Mermaid'}
+                  {type === 'plotly' && 'Plotly'}
+                  {type === 'sheetjs' && 'SheetJS'}
+                  {type === 'threejs' && 'Three.js'}
                 </div>
               </div>
             )}
