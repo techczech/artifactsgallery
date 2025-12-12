@@ -141,7 +141,6 @@ The application uses various technologies to render different types of content:
 - Modify title, description, tags, and folder
 - Change the artifact type if needed
 - Update the code with new content
-- Preview changes before saving
 
 ### Deleting Artifacts
 - Delete button in the artifact view screen

@@ -232,7 +232,7 @@ export function ArtifactGallery() {
   if (loading) {
     return (
       <div className="p-4 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Artifact Gallery</h1>
+        <h1 className="text-2xl font-bold mb-4">Artifacts Gallery</h1>
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           <span className="ml-2">Loading artifacts...</span>

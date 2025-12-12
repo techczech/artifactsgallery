@@ -3,7 +3,7 @@ import _ from 'lodash';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { AlertCircle, BookOpen, Hash, Grid, Search } from 'lucide-react';
 
 const TextAnalysisTool = () => {
